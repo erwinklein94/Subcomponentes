@@ -371,8 +371,8 @@ function header() {
     <nav class="tabs" aria-label="Navegação principal">${TABS.map(([id, ico, label]) => `<button class="tab-btn ${state.active === id ? 'active' : ''}" data-tab="${id}" aria-current="${state.active === id ? 'page' : 'false'}"><span class="tab-icon">${ico}</span><span class="tab-label">${label}</span></button>`).join('')}</nav>
   </header>`;
 }
-function panel(title, subtitle, icon, body, extra = '') {
-  return `<section class="panel"><div class="panel-head"><div class="panel-title"><div class="icon-box">${icon}</div><div><h2>${title}</h2>${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}</div></div>${extra}</div>${body}</section>`;
+function panel(title, subtitle, icon, body, extra = '', cls = '') {
+  return `<section class="panel ${cls}"><div class="panel-head"><div class="panel-title"><div class="icon-box">${icon}</div><div><h2>${title}</h2>${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}</div></div>${extra}</div>${body}</section>`;
 }
 function kpi(title, value, sub, icon, accent) {
   return `<div class="kpi" style="--accent:${accent}"><div class="kpi-top"><div><div class="kpi-title">${title}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></div><div class="kpi-icon">${icon}</div></div></div>`;
@@ -396,17 +396,39 @@ function donut(data) {
 }
 function lineChart(data) {
   if (!data.length) return empty();
-  const w = 900, h = 300, p = 32;
+  const w = 900, h = 280;
+  const left = 70, right = 24, top = 22, bottom = 58;
+  const plotW = w - left - right;
+  const plotH = h - top - bottom;
   const max = Math.max(...data.map((d) => d.value), 1);
-  const step = (w - p * 2) / Math.max(data.length - 1, 1);
-  const pts = data.map((d, i) => {
-    const x = p + i * step;
-    const y = h - p - (d.value / max) * (h - p * 2);
-    return [x, y, d];
-  });
-  const poly = pts.map((point) => `${point[0]},${point[1]}`).join(' ');
-  return `<svg class="svg-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="${THEME.yellow}"/><stop offset="1" stop-color="${THEME.green}"/></linearGradient></defs><g stroke="rgba(255,255,255,.08)">${[0, 1, 2, 3, 4].map((i) => `<line x1="${p}" x2="${w - p}" y1="${p + i * (h - p * 2) / 4}" y2="${p + i * (h - p * 2) / 4}"/>`).join('')}</g><polyline fill="none" stroke="url(#g)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points="${poly}"/>${pts.map(([x, y, d]) => `<circle cx="${x}" cy="${y}" r="6" fill="${THEME.yellow}"><title>${esc(d.name)}: ${fmt(d.value)}</title></circle>`).join('')}</svg>`;
+  const tickCount = 4;
+  const step = plotW / Math.max(data.length, 1);
+  const barW = Math.max(18, Math.min(54, step * 0.58));
+  const y = (v) => top + plotH - (v / max) * plotH;
+  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => max * i / tickCount);
+  return `<svg class="svg-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Gráfico por semana com semanas no eixo horizontal e quantidade no eixo vertical">
+    <defs><linearGradient id="weekBars" x1="0" x2="1"><stop stop-color="${THEME.yellow}"/><stop offset="1" stop-color="${THEME.green}"/></linearGradient></defs>
+    <rect x="0" y="0" width="${w}" height="${h}" fill="transparent"/>
+    <text x="12" y="22" class="axis-small">Qtd.</text>
+    <g stroke="rgba(255,255,255,.09)">${ticks.map((t) => `<line x1="${left}" x2="${w - right}" y1="${y(t)}" y2="${y(t)}"/>`).join('')}</g>
+    <g>${ticks.map((t) => `<text x="${left - 10}" y="${y(t) + 6}" text-anchor="end" class="axis-small">${fmt(t)}</text>`).join('')}</g>
+    <line x1="${left}" x2="${w - right}" y1="${top + plotH}" y2="${top + plotH}" stroke="rgba(255,255,255,.28)"/>
+    <line x1="${left}" x2="${left}" y1="${top}" y2="${top + plotH}" stroke="rgba(255,255,255,.28)"/>
+    ${data.map((d, i) => {
+      const x = left + i * step + (step - barW) / 2;
+      const bh = Math.max(2, (d.value / max) * plotH);
+      const yy = top + plotH - bh;
+      return `<rect x="${x}" y="${yy}" width="${barW}" height="${bh}" rx="8" fill="url(#weekBars)"><title>${esc(d.name)}: ${fmt(d.value)}</title></rect>`;
+    }).join('')}
+    ${data.map((d, i) => {
+      const x = left + i * step + step / 2;
+      const label = String(d.name).replace(/^SEMANA\s*/i, 'S');
+      return `<text x="${x}" y="${h - 24}" text-anchor="middle" class="axis-label">${esc(label)}</text>`;
+    }).join('')}
+    <text x="${left + plotW / 2}" y="${h - 4}" text-anchor="middle" class="axis-small">Semana</text>
+  </svg>`;
 }
+
 function empty(title = 'Sem dados para exibir', sub = 'Importe uma planilha ou ajuste os filtros.') {
   return `<div class="empty"><strong>${title}</strong><br><span>${sub}</span></div>`;
 }
@@ -420,11 +442,12 @@ function importPrompt(area = 'Dashboard') {
 function renderImport() {
   const d = state.data;
   const loaded = hasData();
-  return `<div class="grid grid-2">
-    ${panel('Importar planilha', 'O site inicia sem dados. Carregue uma planilha no mesmo modelo para preencher os dashboards.', '⬆', `<div class="drop" id="drop"><div class="upload-circle">⬆</div><h2>Arraste a planilha aqui</h2><p class="subtitle" style="max-width:720px;margin:10px auto 0">O site procura automaticamente uma aba de estoque e uma aba de inspeções realizadas. O cruzamento geral usa subcomponente/material + lote para comparar saldo de estoque, estoque informado na inspeção, quantidade inspecionada e NC.</p><div style="margin-top:22px"><label class="primary">Selecionar arquivo .xlsx <input id="fileInput" type="file" accept=".xlsx,.xls" hidden></label><button class="secondary" id="resetBase" style="margin-left:10px">Limpar dados</button></div>${state.message ? `<div class="message ok">${esc(state.message)}</div>` : ''}${state.error ? `<div class="message warn">${esc(state.error)}</div>` : ''}${!window.XLSX ? `<div class="message warn">A biblioteca de importação ainda não carregou. Abra o site com internet ativa para importar novas planilhas.</div>` : ''}</div>`)}
-    ${panel('Status da base', loaded ? 'Planilha carregada nesta sessão.' : 'Aguardando importação da sua planilha.', loaded ? '✓' : '○', `<div class="grid grid-2"><div class="tile clip ${loaded ? 'yellow' : ''}"><div class="tile-label">Fonte atual</div><div class="tile-value" style="font-size:18px">${esc(d.source)}</div><div style="margin-top:6px;opacity:.72;font-size:13px">${esc(d.importedAt)}</div></div><div class="tile clip"><div class="tile-label">Abas lidas</div><div style="margin-top:12px;font-weight:800">Estoque: ${esc(text(d.sheetNames?.estoqueName, '—'))}</div><div style="margin-top:6px;font-weight:800">Inspeções: ${esc(text(d.sheetNames?.executadosName, '—'))}</div></div><div class="tile clip"><div class="tile-label">Estoque</div><div class="tile-value">${fmt(d.estoque.length)}</div><div class="subtitle">linhas válidas</div></div><div class="tile clip"><div class="tile-label">Inspeções</div><div class="tile-value">${fmt(d.executados.length)}</div><div class="subtitle">registros executados</div></div></div>`)}
+  return `<div class="view view-import">
+    ${panel('Importar planilha', 'O site inicia sem dados. Carregue uma planilha no mesmo modelo para preencher os dashboards.', '⬆', `<div class="drop" id="drop"><div class="upload-circle">⬆</div><h2>Arraste a planilha aqui</h2><p class="subtitle" style="max-width:720px;margin:10px auto 0">O site procura automaticamente uma aba de estoque e uma aba de inspeções realizadas. O cruzamento geral usa subcomponente/material + lote para comparar saldo de estoque, estoque informado na inspeção, quantidade inspecionada e NC.</p><div style="margin-top:18px"><label class="primary">Selecionar arquivo .xlsx <input id="fileInput" type="file" accept=".xlsx,.xls" hidden></label><button class="secondary" id="resetBase" style="margin-left:10px">Limpar dados</button></div>${state.message ? `<div class="message ok">${esc(state.message)}</div>` : ''}${state.error ? `<div class="message warn">${esc(state.error)}</div>` : ''}${!window.XLSX ? `<div class="message warn">A biblioteca de importação ainda não carregou. Abra o site com internet ativa para importar novas planilhas.</div>` : ''}</div>`)}
+    ${panel('Status da base', loaded ? 'Planilha carregada nesta sessão.' : 'Aguardando importação da sua planilha.', loaded ? '✓' : '○', `<div class="grid grid-2"><div class="tile clip ${loaded ? 'yellow' : ''}"><div class="tile-label">Fonte atual</div><div class="tile-value" style="font-size:16px;overflow-wrap:anywhere">${esc(d.source)}</div><div style="margin-top:6px;opacity:.72;font-size:12px">${esc(d.importedAt)}</div></div><div class="tile clip"><div class="tile-label">Abas lidas</div><div style="margin-top:10px;font-weight:800;font-size:13px">Estoque: ${esc(text(d.sheetNames?.estoqueName, '—'))}</div><div style="margin-top:5px;font-weight:800;font-size:13px">Inspeções: ${esc(text(d.sheetNames?.executadosName, '—'))}</div></div><div class="tile clip"><div class="tile-label">Estoque</div><div class="tile-value">${fmt(d.estoque.length)}</div><div class="subtitle">linhas válidas</div></div><div class="tile clip"><div class="tile-label">Inspeções</div><div class="tile-value">${fmt(d.executados.length)}</div><div class="subtitle">registros executados</div></div></div>`)}
   </div>`;
 }
+
 function renderGeneral() {
   if (!hasData()) return importPrompt('Dashboard geral');
   const rows = buildComparisonRows();
@@ -440,21 +463,28 @@ function renderGeneral() {
   const cobertura = ratioPct(matchedLots, activeStockLots);
   const comp = componentComparison(filtered);
   const status = groupCount(filtered, (r) => r.status);
-  const pendentes = comp.filter((d) => d.pendentes > 0).map((d) => ({ name: d.name, value: d.pendentes })).slice(0, 10);
-  const nc = filtered.filter((r) => r.qtdNc > 0).map((r) => ({ name: `${r.component} • ${r.lote}`, value: r.qtdNc })).sort((a, b) => b.value - a.value).slice(0, 10);
-  const coberturaPorComponente = comp.filter((d) => d.lotesEstoque > 0).sort((a, b) => ratioPct(a.lotesComInspecao, a.lotesEstoque) - ratioPct(b.lotesComInspecao, b.lotesEstoque)).slice(0, 10);
+  const pendentes = comp.filter((d) => d.pendentes > 0).map((d) => ({ name: d.name, value: d.pendentes })).slice(0, 5);
+  const nc = filtered.filter((r) => r.qtdNc > 0).map((r) => ({ name: `${r.component} • ${r.lote}`, value: r.qtdNc })).sort((a, b) => b.value - a.value).slice(0, 5);
+  const coberturaPorComponente = comp.filter((d) => d.lotesEstoque > 0).sort((a, b) => ratioPct(a.lotesComInspecao, a.lotesEstoque) - ratioPct(b.lotesComInspecao, b.lotesEstoque)).slice(0, 6);
 
-  return `<div class="grid grid-4">
-    ${kpi('Cobertura de lotes', pct(cobertura), `${fmt(matchedLots)} de ${fmt(activeStockLots)} lotes em estoque`, '⇄', THEME.blue)}
-    ${kpi('Saldo em estoque', fmt(totalSaldo), 'saldo ativo filtrado', '▦', THEME.green)}
-    ${kpi('Qtd. estoque inspecionada', fmt(totalQtdEstoqueInspecao), `amostra inspecionada: ${fmt(totalInspecionado)}`, '✓', THEME.yellow)}
-    ${kpi('Pendências / NC', `${fmt(pendingLots)} / ${fmt(ncLots)}`, 'lotes pendentes e lotes com NC', '!', THEME.white)}
-  </div>
-  <div style="height:18px"></div>${panel('Filtros do dashboard geral', 'Cruzamento feito por subcomponente/material + lote normalizado.', '☰', filtersGeneral(rows, f))}
-  <div style="height:18px"></div><div class="grid grid-2">${panel('Estoque x inspeção por subcomponente', 'Compara o saldo atual em estoque com a QTD Estoque registrada nas inspeções.', '⇄', dualBarList(comp.slice(0, 10)))}${panel('Situação do cruzamento', 'Classificação por lote e subcomponente.', '✓', donut(status))}</div>
-  <div style="height:18px"></div><div class="grid grid-2">${panel('Menor cobertura por subcomponente', 'Percentual de lotes ativos que já aparecem nas inspeções realizadas.', '%', progressList(coberturaPorComponente))}${panel('Pendentes e NC', 'Top pendências de inspeção e não conformidades.', '!', `<div class="grid grid-2"><div>${pendentes.length ? `<p class="subtitle" style="margin-bottom:12px">Pendentes de inspeção</p>${barList(pendentes)}` : empty('Sem pendências nos filtros', 'Todos os lotes filtrados em estoque possuem inspeção relacionada.')}</div><div>${nc.length ? `<p class="subtitle" style="margin-bottom:12px">Não conformidades</p>${barList(nc)}` : empty('Sem NC nos filtros', 'Nenhum lote filtrado possui QTD NC acima de zero.')}</div></div>`)}</div>
-  <div style="height:18px"></div>${panel('Matriz de comparação subcomponente + lote', `${fmt(filtered.length)} combinações encontradas`, '▦', comparisonTable(filtered))}`;
+  return `<div class="view view-dashboard">
+    <div class="kpi-strip">
+      ${kpi('Cobertura de lotes', pct(cobertura), `${fmt(matchedLots)} de ${fmt(activeStockLots)} lotes em estoque`, '⇄', THEME.blue)}
+      ${kpi('Saldo em estoque', fmt(totalSaldo), 'saldo ativo filtrado', '▦', THEME.green)}
+      ${kpi('Qtd. estoque inspecionada', fmt(totalQtdEstoqueInspecao), `amostra inspecionada: ${fmt(totalInspecionado)}`, '✓', THEME.yellow)}
+      ${kpi('Pendências / NC', `${fmt(pendingLots)} / ${fmt(ncLots)}`, 'lotes pendentes e lotes com NC', '!', THEME.white)}
+    </div>
+    ${panel('Filtros do dashboard geral', 'Cruzamento feito por subcomponente/material + lote normalizado.', '☰', filtersGeneral(rows, f), '', 'filter-panel')}
+    <div class="dashboard-grid">
+      ${panel('Estoque x inspeção por subcomponente', 'Saldo atual x QTD Estoque registrada nas inspeções.', '⇄', dualBarList(comp.slice(0, 6)), '', 'span-2')}
+      ${panel('Situação do cruzamento', 'Classificação por lote e subcomponente.', '✓', donut(status))}
+      ${panel('Menor cobertura por subcomponente', 'Percentual de lotes ativos que já aparecem nas inspeções realizadas.', '%', progressList(coberturaPorComponente))}
+      ${panel('Pendentes e NC', 'Top pendências de inspeção e não conformidades.', '!', `<div class="grid grid-2"><div>${pendentes.length ? `<p class="subtitle" style="margin-bottom:8px">Pendentes de inspeção</p>${barList(pendentes)}` : empty('Sem pendências nos filtros', 'Todos os lotes filtrados em estoque possuem inspeção relacionada.')}</div><div>${nc.length ? `<p class="subtitle" style="margin-bottom:8px">Não conformidades</p>${barList(nc)}` : empty('Sem NC nos filtros', 'Nenhum lote filtrado possui QTD NC acima de zero.')}</div></div>`, '', 'span-2')}
+      ${panel('Matriz de comparação subcomponente + lote', `${fmt(filtered.length)} combinações encontradas`, '▦', comparisonTable(filtered, 5), '', 'span-2')}
+    </div>
+  </div>`;
 }
+
 function filtersGeneral(rows, f) {
   return `<div class="filter-grid grid-4">
     <label class="control">Subcomponente<select data-filter="gen.component">${optionList(uniq(rows, (r) => r.component), f.component)}</select></label>
@@ -463,9 +493,11 @@ function filtersGeneral(rows, f) {
     <label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(f.search)}" placeholder="Buscar lote, fornecedor, fábrica..." data-filter="gen.search"></div></label>
   </div>`;
 }
-function comparisonTable(rows) {
-  return `<div class="table-wrap"><div class="scroll"><table class="compare-table"><thead><tr><th>Subcomponente</th><th>Lote</th><th>Situação</th><th class="right">Saldo estoque</th><th class="right">QTD estoque inspeção</th><th class="right">Diferença</th><th class="right">Qtd. inspecionada</th><th class="right">QTD NC</th><th>Fábrica / Fornecedor</th><th>Última inspeção</th></tr></thead><tbody>${rows.slice(0, 350).map((r) => `<tr><td><strong>${esc(text(r.component))}</strong></td><td>${esc(text(r.lote))}</td><td>${pill(r.status)}</td><td class="right"><strong>${fmt(r.saldoEstoque)}</strong></td><td class="right">${fmt(r.qtdEstoqueInspecao)}</td><td class="right"><span class="${differenceClass(r.diffEstoqueInspecao)}">${fmt(r.diffEstoqueInspecao)}</span></td><td class="right">${fmt(r.qtdInspecionado)}</td><td class="right"><strong>${fmt(r.qtdNc)}</strong></td><td>${esc([r.fabricas.join(', '), r.fornecedores.join(', ')].filter(Boolean).join(' / ') || '—')}</td><td>${esc(fdate(r.lastDate))}</td></tr>`).join('')}</tbody></table></div></div>`;
+function comparisonTable(rows, limit = 6) {
+  const shown = rows.slice(0, limit);
+  return `<div class="table-wrap"><div class="scroll"><table class="compare-table"><thead><tr><th>Subcomponente</th><th>Lote</th><th>Situação</th><th class="right">Saldo estoque</th><th class="right">QTD estoque inspeção</th><th class="right">Diferença</th><th class="right">Qtd. inspecionada</th><th class="right">QTD NC</th><th>Fábrica / Fornecedor</th><th>Última inspeção</th></tr></thead><tbody>${shown.map((r) => `<tr><td><strong>${esc(text(r.component))}</strong></td><td>${esc(text(r.lote))}</td><td>${pill(r.status)}</td><td class="right"><strong>${fmt(r.saldoEstoque)}</strong></td><td class="right">${fmt(r.qtdEstoqueInspecao)}</td><td class="right"><span class="${differenceClass(r.diffEstoqueInspecao)}">${fmt(r.diffEstoqueInspecao)}</span></td><td class="right">${fmt(r.qtdInspecionado)}</td><td class="right"><strong>${fmt(r.qtdNc)}</strong></td><td>${esc([r.fabricas.join(', '), r.fornecedores.join(', ')].filter(Boolean).join(' / ') || '—')}</td><td>${esc(fdate(r.lastDate))}</td></tr>`).join('')}</tbody></table></div></div>${rows.length > limit ? `<div class="compact-note">Mostrando ${fmt(limit)} de ${fmt(rows.length)} combinações. Use os filtros para refinar sem rolagem.</div>` : ''}`;
 }
+
 function filtersStock(records, filters) {
   return `<div class="filter-grid grid-4"><label class="control">Subcomponente<select data-filter="stock.component">${optionList(uniq(records, (r) => r.subcomponente), filters.component)}</select></label><label class="control">Fábrica<select data-filter="stock.factory">${optionList(uniq(records, (r) => r.fabrica), filters.factory)}</select></label><label class="control">Status<select data-filter="stock.status">${optionList(uniq(records, (r) => r.status), filters.status)}</select></label><label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(filters.search)}" placeholder="Buscar lote, material, observação..." data-filter="stock.search"></div></label></div>`;
 }
@@ -473,23 +505,31 @@ function renderStock() {
   if (!hasData()) return importPrompt('Dashboard de estoque');
   const enriched = state.data.estoque.map((r) => ({ ...r, status: stockStatus(r) }));
   const f = state.stockFilters;
-  const filtered = enriched.filter((r) => (!f.component || r.subcomponente === f.component) && (!f.factory || r.fabrica === f.factory) && (!f.status || r.status === f.status) && matches(`${r.subcomponente} ${r.lote} ${r.fabrica} ${r.obs} ${r.dataInspecao}`, f.search));
-  const total = filtered.reduce((s, r) => s + num(r.quantidadeEntrada), 0);
+  const filtered = enriched.filter((r) => (!f.component || r.subcomponente === f.component) && (!f.factory || r.fabrica === f.factory) && (!f.status || r.status === f.status) && matches(`${r.subcomponente} ${r.lote} ${r.fabrica} ${r.status} ${r.obs} ${r.observacao}`, f.search));
+  const totalEntrada = filtered.reduce((s, r) => s + num(r.quantidadeEntrada), 0);
   const saldo = filtered.filter((r) => r.status !== 'Fora do estoque').reduce((s, r) => s + num(r.quantidadeEntrada), 0);
+  const lotes = new Set(filtered.map((r) => lotKey(r.lote))).size;
   const amostra = filtered.reduce((s, r) => s + num(r.amostragem), 0);
-  const lotes = new Set(filtered.filter((r) => r.status !== 'Fora do estoque').map((r) => `${r.subcomponente}-${r.lote}`)).size;
-  const comp = groupSum(filtered.filter((r) => r.status !== 'Fora do estoque'), (r) => r.subcomponente, (r) => r.quantidadeEntrada).slice(0, 10);
-  const status = groupCount(filtered, (r) => r.status);
+  const comp = groupSum(filtered.filter((r) => r.status !== 'Fora do estoque'), (r) => r.subcomponente, (r) => r.quantidadeEntrada).slice(0, 8);
   const fab = groupSum(filtered, (r) => r.fabrica, (r) => r.quantidadeEntrada).slice(0, 8);
-  return `<div class="grid grid-4">${kpi('Entrada total', fmt(total), 'soma dos registros filtrados', '▣', THEME.blue)}${kpi('Saldo estimado', fmt(saldo), 'exclui itens fora do estoque', '▦', THEME.green)}${kpi('Lotes ativos', fmt(lotes), 'subcomponente + lote', '◇', THEME.yellow)}${kpi('Amostragem', fmt(amostra), 'quantidade prevista para inspeção', '✓', THEME.white)}</div>
-  <div style="height:18px"></div>${panel('Filtros do estoque', 'Os filtros afetam KPIs, gráficos e tabela.', '☰', filtersStock(enriched, f))}
-  <div style="height:18px"></div><div class="grid grid-2">${panel('Saldo por subcomponente', 'Top 10 pelo saldo estimado.', '▤', barList(comp))}${panel('Status do estoque', 'Distribuição por lote/registro.', '✓', donut(status))}</div>
-  <div style="height:18px"></div>${panel('Entrada por fábrica', 'Visão da origem dos subcomponentes.', '⌂', barList(fab))}
-  <div style="height:18px"></div>${panel('Itens de estoque', `${fmt(filtered.length)} registros encontrados`, '▦', stockTable(filtered))}`;
+  const status = groupCount(filtered, (r) => r.status);
+  return `<div class="view view-dashboard">
+    <div class="kpi-strip">${kpi('Entrada total', fmt(totalEntrada), 'somatório de entradas', '▦', THEME.blue)}${kpi('Saldo atual', fmt(saldo), 'exclui fora do estoque', '✓', THEME.green)}${kpi('Lotes', fmt(lotes), 'lotes únicos filtrados', '◇', THEME.yellow)}${kpi('Amostragem', fmt(amostra), 'quantidade prevista para inspeção', '✓', THEME.white)}</div>
+    ${panel('Filtros do estoque', 'Os filtros afetam KPIs, gráficos e tabela.', '☰', filtersStock(enriched, f), '', 'filter-panel')}
+    <div class="dashboard-grid">
+      ${panel('Saldo por subcomponente', 'Top 8 pelo saldo estimado.', '▤', barList(comp), '', 'span-2')}
+      ${panel('Status do estoque', 'Distribuição por lote/registro.', '✓', donut(status))}
+      ${panel('Entrada por fábrica', 'Visão da origem dos subcomponentes.', '⌂', barList(fab))}
+      ${panel('Itens de estoque', `${fmt(filtered.length)} registros encontrados`, '▦', stockTable(filtered, 7), '', 'span-4')}
+    </div>
+  </div>`;
 }
-function stockTable(rows) {
-  return `<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Data</th><th>Fábrica</th><th>Subcomponente</th><th>Lote</th><th class="right">Entrada</th><th class="right">Amostragem</th><th>Status</th><th>Inspeção</th></tr></thead><tbody>${rows.slice(0, 250).map((r) => `<tr><td>${esc(fdate(r.data))}</td><td>${esc(text(r.fabrica))}</td><td><strong>${esc(text(r.subcomponente))}</strong></td><td>${esc(text(r.lote))}</td><td class="right"><strong>${fmt(r.quantidadeEntrada)}</strong></td><td class="right">${fmt(r.amostragem)}</td><td>${pill(r.status)}</td><td>${esc(fdate(r.dataInspecao))}</td></tr>`).join('')}</tbody></table></div></div>`;
+
+function stockTable(rows, limit = 7) {
+  const shown = rows.slice(0, limit);
+  return `<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Data</th><th>Fábrica</th><th>Subcomponente</th><th>Lote</th><th class="right">Entrada</th><th class="right">Amostragem</th><th>Status</th><th>Inspeção</th></tr></thead><tbody>${shown.map((r) => `<tr><td>${esc(fdate(r.data))}</td><td>${esc(text(r.fabrica))}</td><td><strong>${esc(text(r.subcomponente))}</strong></td><td>${esc(text(r.lote))}</td><td class="right"><strong>${fmt(r.quantidadeEntrada)}</strong></td><td class="right">${fmt(r.amostragem)}</td><td>${pill(r.status)}</td><td>${esc(fdate(r.dataInspecao))}</td></tr>`).join('')}</tbody></table></div></div>${rows.length > limit ? `<div class="compact-note">Mostrando ${fmt(limit)} de ${fmt(rows.length)} registros. Use os filtros para localizar itens específicos.</div>` : ''}`;
 }
+
 function renderInspections() {
   if (!hasData()) return importPrompt('Dashboard de inspeções realizadas');
   const records = state.data.executados;
@@ -500,21 +540,30 @@ function renderInspections() {
   const am = filtered.reduce((s, r) => s + num(r.qtdAmostra), 0);
   const ncRate = ins ? nc / ins * 100 : 0;
   const status = groupCount(filtered, (r) => r.status);
-  const week = groupSum(filtered, (r) => r.semana || fdate(r.diaInspecao), (r) => r.qtdInspecionado).sort((a, b) => a.name.localeCompare(b.name)).slice(-14);
+  const week = groupSum(filtered, (r) => r.semana || fdate(r.diaInspecao), (r) => r.qtdInspecionado).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true })).slice(-10);
   const forn = groupSum(filtered, (r) => r.fornecedor, (r) => r.qtdInspecionado).slice(0, 8);
-  const matNc = groupSum(filtered, (r) => r.material, (r) => r.qtdNc).filter((d) => d.value > 0).slice(0, 10);
-  return `<div class="grid grid-4">${kpi('Inspeções', fmt(filtered.length), 'lotes/BAGs executados', '✓', THEME.blue)}${kpi('Qtd. inspecionada', fmt(ins), `amostra: ${fmt(am)}`, '▣', THEME.green)}${kpi('Não conformidades', fmt(nc), 'soma de QTD NC', '!', THEME.yellow)}${kpi('Taxa NC', pct(ncRate), 'NC / qtd. inspecionada', '%', THEME.white)}</div>
-  <div style="height:18px"></div>${panel('Filtros das inspeções realizadas', 'Filtre por material, fornecedor, semana e status.', '☰', filtersInspection(records, f))}
-  <div style="height:18px"></div><div class="grid grid-2">${panel('Inspecionado por semana', 'Evolução dos registros executados.', '⌁', lineChart(week))}${panel('Status das inspeções', 'Resultado por lote/BAG.', '✓', donut(status))}</div>
-  <div style="height:18px"></div><div class="grid grid-2">${panel('Inspecionado por fornecedor', 'Top fornecedores por quantidade inspecionada.', '⌂', barList(forn))}${panel('Materiais com NC', 'Aparecem apenas itens com QTD NC acima de zero.', '!', matNc.length ? barList(matNc) : empty('Nenhuma NC nos filtros', 'Os registros filtrados não possuem não conformidades.'))}</div>
-  <div style="height:18px"></div>${panel('Tabela de inspeções realizadas', `${fmt(filtered.length)} registros encontrados`, '▦', inspectionTable(filtered))}`;
+  const matNc = groupSum(filtered, (r) => r.material, (r) => r.qtdNc).filter((d) => d.value > 0).slice(0, 8);
+  return `<div class="view view-dashboard">
+    <div class="kpi-strip">${kpi('Inspeções', fmt(filtered.length), 'lotes/BAGs executados', '✓', THEME.blue)}${kpi('Qtd. inspecionada', fmt(ins), `amostra: ${fmt(am)}`, '▣', THEME.green)}${kpi('Não conformidades', fmt(nc), 'soma de QTD NC', '!', THEME.yellow)}${kpi('Taxa NC', pct(ncRate), 'NC / qtd. inspecionada', '%', THEME.white)}</div>
+    ${panel('Filtros das inspeções realizadas', 'Filtre por material, fornecedor, semana e status.', '☰', filtersInspection(records, f), '', 'filter-panel')}
+    <div class="dashboard-grid">
+      ${panel('Inspecionado por semana', 'Semanas no eixo horizontal e quantidade no eixo vertical.', '⌁', lineChart(week), '', 'span-2')}
+      ${panel('Status das inspeções', 'Resultado por lote/BAG.', '✓', donut(status))}
+      ${panel('Materiais com NC', 'Aparecem apenas itens com QTD NC acima de zero.', '!', matNc.length ? barList(matNc) : empty('Nenhuma NC nos filtros', 'Os registros filtrados não possuem não conformidades.'))}
+      ${panel('Inspecionado por fornecedor', 'Top fornecedores por quantidade inspecionada.', '⌂', barList(forn), '', 'span-2')}
+      ${panel('Tabela de inspeções realizadas', `${fmt(filtered.length)} registros encontrados`, '▦', inspectionTable(filtered, 7), '', 'span-2')}
+    </div>
+  </div>`;
 }
+
 function filtersInspection(records, f) {
   return `<div class="filter-grid grid-5"><label class="control">Material<select data-filter="insp.material">${optionList(uniq(records, (r) => r.material), f.material)}</select></label><label class="control">Fornecedor<select data-filter="insp.fornecedor">${optionList(uniq(records, (r) => r.fornecedor), f.fornecedor)}</select></label><label class="control">Status<select data-filter="insp.status">${optionList(uniq(records, (r) => r.status), f.status)}</select></label><label class="control">Semana<select data-filter="insp.semana">${optionList(uniq(records, (r) => r.semana), f.semana)}</select></label><label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(f.search)}" placeholder="Buscar lote, SAP..." data-filter="insp.search"></div></label></div>`;
 }
-function inspectionTable(rows) {
-  return `<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Data</th><th>Semana</th><th>Material</th><th>SAP</th><th>Fornecedor</th><th>Lote</th><th class="right">QTD Estoque</th><th class="right">Amostra</th><th class="right">Inspecionado</th><th class="right">NC</th><th>Status</th></tr></thead><tbody>${rows.slice(0, 250).map((r) => `<tr><td>${esc(fdate(r.diaInspecao))}</td><td>${esc(text(r.semana))}</td><td><strong>${esc(text(r.material))}</strong></td><td>${esc(text(r.codSap))}</td><td>${esc(text(r.fornecedor))}</td><td>${esc(text(r.lote))}</td><td class="right">${fmt(r.qtdEstoque)}</td><td class="right">${fmt(r.qtdAmostra)}</td><td class="right"><strong>${fmt(r.qtdInspecionado)}</strong></td><td class="right"><strong>${fmt(r.qtdNc)}</strong></td><td>${pill(r.status)}</td></tr>`).join('')}</tbody></table></div></div>`;
+function inspectionTable(rows, limit = 7) {
+  const shown = rows.slice(0, limit);
+  return `<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Data</th><th>Semana</th><th>Material</th><th>SAP</th><th>Fornecedor</th><th>Lote</th><th class="right">QTD Estoque</th><th class="right">Amostra</th><th class="right">Inspecionado</th><th class="right">NC</th><th>Status</th></tr></thead><tbody>${shown.map((r) => `<tr><td>${esc(fdate(r.diaInspecao))}</td><td>${esc(text(r.semana))}</td><td><strong>${esc(text(r.material))}</strong></td><td>${esc(text(r.codSap))}</td><td>${esc(text(r.fornecedor))}</td><td>${esc(text(r.lote))}</td><td class="right">${fmt(r.qtdEstoque)}</td><td class="right">${fmt(r.qtdAmostra)}</td><td class="right"><strong>${fmt(r.qtdInspecionado)}</strong></td><td class="right"><strong>${fmt(r.qtdNc)}</strong></td><td>${pill(r.status)}</td></tr>`).join('')}</tbody></table></div></div>${rows.length > limit ? `<div class="compact-note">Mostrando ${fmt(limit)} de ${fmt(rows.length)} registros. Use os filtros para localizar itens específicos.</div>` : ''}`;
 }
+
 function combineCards() {
   const map = new Map();
   const ensure = (name) => {
@@ -547,8 +596,14 @@ function renderCards() {
   if (!hasData()) return importPrompt('Cards por subcomponente');
   const f = state.cardFilters;
   const cards = combineCards().filter((c) => (f.hasNc !== 'sim' || c.qtdNc > 0) && (f.hasNc !== 'nao' || c.qtdNc <= 0) && (f.hasStock !== 'sim' || c.saldoEstimado > 0) && (f.hasStock !== 'nao' || c.saldoEstimado <= 0) && matches(`${c.name} ${c.fabricas.join(' ')} ${c.fornecedores.join(' ')} ${c.status.join(' ')}`, f.query));
-  return `${panel('Filtros dos cards', 'Cards consolidados por subcomponente/material.', '☰', `<div class="filter-grid grid-3"><label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(f.query)}" placeholder="Buscar subcomponente, fábrica ou fornecedor..." data-filter="card.query"></div></label><label class="control">Com NC?<select data-filter="card.hasNc">${optionList(['sim', 'nao'], f.hasNc)}</select></label><label class="control">Com saldo estimado?<select data-filter="card.hasStock">${optionList(['sim', 'nao'], f.hasStock)}</select></label></div>`)}<div style="height:18px"></div><div class="cards">${cards.map(cardHtml).join('')}</div>${cards.length ? '' : empty('Nenhum card encontrado', 'Ajuste os filtros dos cards para visualizar os subcomponentes.')}`;
+  const shown = cards.slice(0, 6);
+  return `<div class="view view-cards">
+    ${panel('Filtros dos cards', 'Cards consolidados por subcomponente/material.', '☰', `<div class="filter-grid grid-3"><label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(f.query)}" placeholder="Buscar subcomponente, fábrica ou fornecedor..." data-filter="card.query"></div></label><label class="control">Com NC?<select data-filter="card.hasNc">${optionList(['sim', 'nao'], f.hasNc)}</select></label><label class="control">Com saldo estimado?<select data-filter="card.hasStock">${optionList(['sim', 'nao'], f.hasStock)}</select></label></div>`, '', 'filter-panel')}
+    <div class="cards">${shown.map(cardHtml).join('')}${shown.length ? '' : empty('Nenhum card encontrado', 'Ajuste os filtros dos cards para visualizar os subcomponentes.')}</div>
+    ${cards.length > shown.length ? `<div class="compact-note">Mostrando ${fmt(shown.length)} de ${fmt(cards.length)} cards. Use busca e filtros para localizar outros subcomponentes sem rolagem.</div>` : ''}
+  </div>`;
 }
+
 function cardHtml(c) {
   return `<article class="card ${c.qtdNc > 0 ? 'nc' : ''}"><p class="eyebrow" style="color:${c.qtdNc > 0 ? THEME.yellow : THEME.green};letter-spacing:.18em">Subcomponente</p><h3>${esc(c.name)}</h3><div class="card-grid"><div class="mini clip"><div class="tile-label">Saldo estimado</div><div class="num">${fmt(c.saldoEstimado)}</div></div><div class="mini clip ${c.qtdNc > 0 ? 'yellow' : ''}"><div class="tile-label">QTD NC</div><div class="num">${fmt(c.qtdNc)}</div></div><div class="mini clip"><div class="tile-label">Inspecionado</div><div class="num">${fmt(c.qtdInspecionado)}</div></div><div class="mini clip"><div class="tile-label">Lotes estoque</div><div class="num">${fmt(c.lotes.length)}</div></div></div><div class="meta"><strong style="color:white">Entrada total:</strong> ${fmt(c.totalEntrada)}<br><strong style="color:white">Pendências:</strong> ${fmt(c.pendentes)} registros de estoque<br><strong style="color:white">Taxa NC:</strong> ${pct(c.ncRate)}<br><strong style="color:white">Fábricas:</strong> ${esc(c.fabricas.slice(0, 3).join(', ') || '—')}<br><strong style="color:white">Fornecedores:</strong> ${esc(c.fornecedores.slice(0, 3).join(', ') || '—')}</div><div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">${c.status.length ? c.status.map(pill).join('') : pill('Sem inspeção')}</div></article>`;
 }
