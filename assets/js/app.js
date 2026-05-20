@@ -350,7 +350,7 @@ function header() {
       <div class="brand-lockup">
         <div class="logo" aria-label="Rumo">rum<span class="o">o</span></div>
         <div class="brand-copy">
-          <p class="eyebrow">Cavan • Subcomponentes ferroviários</p>
+          <p class="eyebrow">Subcomponentes</p>
           <h1>Controle visual de estoque e inspeções</h1>
         </div>
       </div>
@@ -361,7 +361,7 @@ function header() {
       </div>
     </div>
     <div class="hero-summary">
-      <p class="desc">Importe uma planilha no modelo combinado para visualizar estoque, inspeções realizadas e o cruzamento por subcomponente + lote.</p>
+      <p class="desc">Importe uma planilha no modelo combinado para visualizar estoque e inspeções realizadas.</p>
       <div class="hero-metrics">
         <div class="tile clip"><div class="tile-label">Lotes em estoque</div><div class="tile-value">${fmt(stockLots)}</div></div>
         <div class="tile clip"><div class="tile-label">Inspeções realizadas</div><div class="tile-value">${fmt(matchedLots)}</div></div>
@@ -422,7 +422,7 @@ function renderImport() {
   const loaded = hasData();
   return `<div class="grid grid-2">
     ${panel('Importar planilha', 'O site inicia sem dados. Carregue uma planilha no mesmo modelo para preencher os dashboards.', '⬆', `<div class="drop" id="drop"><div class="upload-circle">⬆</div><h2>Arraste a planilha aqui</h2><p class="subtitle" style="max-width:720px;margin:10px auto 0">O site procura automaticamente uma aba de estoque e uma aba de inspeções realizadas. O cruzamento geral usa subcomponente/material + lote para comparar saldo de estoque, estoque informado na inspeção, quantidade inspecionada e NC.</p><div style="margin-top:22px"><label class="primary">Selecionar arquivo .xlsx <input id="fileInput" type="file" accept=".xlsx,.xls" hidden></label><button class="secondary" id="resetBase" style="margin-left:10px">Limpar dados</button></div>${state.message ? `<div class="message ok">${esc(state.message)}</div>` : ''}${state.error ? `<div class="message warn">${esc(state.error)}</div>` : ''}${!window.XLSX ? `<div class="message warn">A biblioteca de importação ainda não carregou. Abra o site com internet ativa para importar novas planilhas.</div>` : ''}</div>`)}
-    ${panel('Status da base', loaded ? 'Planilha carregada nesta sessão.' : 'Aguardando importação da sua planilha.', loaded ? '✓' : '○', `<div class="grid grid-2"><div class="tile clip ${loaded ? 'yellow' : ''}"><div class="tile-label">Fonte atual</div><div class="tile-value" style="font-size:18px">${esc(d.source)}</div><div style="margin-top:6px;opacity:.72;font-size:13px">${esc(d.importedAt)}</div></div><div class="tile clip"><div class="tile-label">Abas lidas</div><div style="margin-top:12px;font-weight:800">Estoque: ${esc(text(d.sheetNames?.estoqueName, '—'))}</div><div style="margin-top:6px;font-weight:800">Inspeções: ${esc(text(d.sheetNames?.executadosName, '—'))}</div></div><div class="tile clip"><div class="tile-label">Estoque</div><div class="tile-value">${fmt(d.estoque.length)}</div><div class="subtitle">linhas válidas</div></div><div class="tile clip"><div class="tile-label">Inspeções</div><div class="tile-value">${fmt(d.executados.length)}</div><div class="subtitle">registros executados</div></div></div><div class="hint" style="margin-top:18px"><strong style="color:white">Cabeçalhos esperados</strong><br>Estoque: Data, Fábrica, Subcomponente, Lote, Quantidade Entrada, Amostragem, Data da Inspeção.<br>Inspeções: Dia Inspeção, Semana, Material, Fornecedor, Lote, QTD Estoque, QTD Amostra, QTD Inspecionado, QTD NC, Status.</div>`)}
+    ${panel('Status da base', loaded ? 'Planilha carregada nesta sessão.' : 'Aguardando importação da sua planilha.', loaded ? '✓' : '○', `<div class="grid grid-2"><div class="tile clip ${loaded ? 'yellow' : ''}"><div class="tile-label">Fonte atual</div><div class="tile-value" style="font-size:18px">${esc(d.source)}</div><div style="margin-top:6px;opacity:.72;font-size:13px">${esc(d.importedAt)}</div></div><div class="tile clip"><div class="tile-label">Abas lidas</div><div style="margin-top:12px;font-weight:800">Estoque: ${esc(text(d.sheetNames?.estoqueName, '—'))}</div><div style="margin-top:6px;font-weight:800">Inspeções: ${esc(text(d.sheetNames?.executadosName, '—'))}</div></div><div class="tile clip"><div class="tile-label">Estoque</div><div class="tile-value">${fmt(d.estoque.length)}</div><div class="subtitle">linhas válidas</div></div><div class="tile clip"><div class="tile-label">Inspeções</div><div class="tile-value">${fmt(d.executados.length)}</div><div class="subtitle">registros executados</div></div></div>`)}
   </div>`;
 }
 function renderGeneral() {
@@ -700,7 +700,7 @@ function render() {
     cards: renderCards
   };
   const active = (views[state.active] || renderGeneral)();
-  $('#app').innerHTML = `${header()}<main class="content">${active}</main><footer><span><strong style="color:white">Rumo • Controle Cavan</strong> — dashboard geral cruza subcomponente + lote entre estoque e inspeções realizadas.</span><span>Importação local: os dados da planilha ficam no navegador.</span></footer>`;
+  $('#app').innerHTML = `${header()}<main class="content">${active}</main><footer><span><strong style="color:white">Controle de Qualidade de Subcomponentes</strong></span><span>Importação local: os dados da planilha ficam no navegador.</span></footer>`;
   bind();
 }
 window.addEventListener('xlsx-ready', () => {

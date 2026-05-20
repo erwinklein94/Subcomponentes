@@ -1,4 +1,4 @@
-# Controle Visual Rumo Cavan
+# Controle de Qualidade de Subcomponentes
 
 Site estático para GitHub Pages, com importação local de planilhas `.xlsx`, dashboards de estoque, inspeções realizadas e cruzamento geral por **subcomponente/material + lote**.
 
