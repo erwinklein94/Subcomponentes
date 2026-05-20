@@ -394,18 +394,38 @@ function donut(data) {
   }).join(',');
   return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${stops})"></div><div class="legend">${data.map((d, i) => `<div class="legend-row"><span class="dot" style="background:${COLORS[i % COLORS.length]}"></span><strong>${esc(d.name)}</strong><span>${fmt(d.value)}</span></div>`).join('')}</div></div>`;
 }
+function niceMax(value) {
+  const n = Math.max(1, num(value));
+  const magnitude = 10 ** Math.floor(Math.log10(n));
+  const rounded = Math.ceil(n / magnitude * 1.05) * magnitude;
+  return rounded || 1;
+}
+function weekSortValue(name) {
+  const s = String(name ?? '');
+  const m = s.match(/\d+/);
+  return m ? Number(m[0]) : Number.MAX_SAFE_INTEGER;
+}
 function lineChart(data) {
   if (!data.length) return empty();
-  const w = 900, h = 300, p = 32;
-  const max = Math.max(...data.map((d) => d.value), 1);
-  const step = (w - p * 2) / Math.max(data.length - 1, 1);
+  const w = 920, h = 360;
+  const left = 78, right = 28, top = 28, bottom = 82;
+  const chartW = w - left - right;
+  const chartH = h - top - bottom;
+  const max = niceMax(Math.max(...data.map((d) => d.value), 1));
+  const step = chartW / Math.max(data.length - 1, 1);
+  const y = (value) => top + chartH - (num(value) / max) * chartH;
   const pts = data.map((d, i) => {
-    const x = p + i * step;
-    const y = h - p - (d.value / max) * (h - p * 2);
-    return [x, y, d];
+    const x = left + i * step;
+    return [x, y(d.value), d];
   });
   const poly = pts.map((point) => `${point[0]},${point[1]}`).join(' ');
-  return `<svg class="svg-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="${THEME.yellow}"/><stop offset="1" stop-color="${THEME.green}"/></linearGradient></defs><g stroke="rgba(255,255,255,.08)">${[0, 1, 2, 3, 4].map((i) => `<line x1="${p}" x2="${w - p}" y1="${p + i * (h - p * 2) / 4}" y2="${p + i * (h - p * 2) / 4}"/>`).join('')}</g><polyline fill="none" stroke="url(#g)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points="${poly}"/>${pts.map(([x, y, d]) => `<circle cx="${x}" cy="${y}" r="6" fill="${THEME.yellow}"><title>${esc(d.name)}: ${fmt(d.value)}</title></circle>`).join('')}</svg>`;
+  const ticks = [0, 1, 2, 3, 4].map((i) => Math.round((max / 4) * i));
+  const xLabels = pts.map(([x, _y, d], i) => {
+    const label = esc(d.name);
+    const rotate = data.length > 7 ? ` transform="rotate(-35 ${x} ${h - bottom + 28})" text-anchor="end"` : ' text-anchor="middle"';
+    return `<text class="axis-text" x="${x}" y="${h - bottom + 32}"${rotate}>${label}</text>`;
+  }).join('');
+  return `<svg class="svg-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Gráfico de quantidade inspecionada por semana"><defs><linearGradient id="gWeek" x1="0" x2="1"><stop stop-color="${THEME.yellow}"/><stop offset="1" stop-color="${THEME.green}"/></linearGradient></defs><g>${ticks.map((t) => { const yy = y(t); return `<line class="grid-line" x1="${left}" x2="${w - right}" y1="${yy}" y2="${yy}"/><text class="axis-text" x="${left - 12}" y="${yy + 5}" text-anchor="end">${fmt(t)}</text>`; }).join('')}</g><line class="axis-line" x1="${left}" x2="${left}" y1="${top}" y2="${h - bottom}"/><line class="axis-line" x1="${left}" x2="${w - right}" y1="${h - bottom}" y2="${h - bottom}"/><text class="axis-label" x="${left + chartW / 2}" y="${h - 12}" text-anchor="middle">Semana</text><text class="axis-label" x="20" y="${top + chartH / 2}" text-anchor="middle" transform="rotate(-90 20 ${top + chartH / 2})">Quantidade</text>${xLabels}<polyline fill="none" stroke="url(#gWeek)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points="${poly}"/>${pts.map(([x, yy, d]) => `<circle cx="${x}" cy="${yy}" r="6" fill="${THEME.yellow}"><title>${esc(d.name)}: ${fmt(d.value)}</title></circle><text class="axis-text" x="${x}" y="${yy - 12}" text-anchor="middle">${fmt(d.value)}</text>`).join('')}</svg>`;
 }
 function empty(title = 'Sem dados para exibir', sub = 'Importe uma planilha ou ajuste os filtros.') {
   return `<div class="empty"><strong>${title}</strong><br><span>${sub}</span></div>`;
@@ -500,7 +520,7 @@ function renderInspections() {
   const am = filtered.reduce((s, r) => s + num(r.qtdAmostra), 0);
   const ncRate = ins ? nc / ins * 100 : 0;
   const status = groupCount(filtered, (r) => r.status);
-  const week = groupSum(filtered, (r) => r.semana || fdate(r.diaInspecao), (r) => r.qtdInspecionado).sort((a, b) => a.name.localeCompare(b.name)).slice(-14);
+  const week = groupSum(filtered, (r) => r.semana || fdate(r.diaInspecao), (r) => r.qtdInspecionado).sort((a, b) => weekSortValue(a.name) - weekSortValue(b.name) || a.name.localeCompare(b.name, 'pt-BR')).slice(-14);
   const forn = groupSum(filtered, (r) => r.fornecedor, (r) => r.qtdInspecionado).slice(0, 8);
   const matNc = groupSum(filtered, (r) => r.material, (r) => r.qtdNc).filter((d) => d.value > 0).slice(0, 10);
   return `<div class="grid grid-4">${kpi('Inspeções', fmt(filtered.length), 'lotes/BAGs executados', '✓', THEME.blue)}${kpi('Qtd. inspecionada', fmt(ins), `amostra: ${fmt(am)}`, '▣', THEME.green)}${kpi('Não conformidades', fmt(nc), 'soma de QTD NC', '!', THEME.yellow)}${kpi('Taxa NC', pct(ncRate), 'NC / qtd. inspecionada', '%', THEME.white)}</div>
