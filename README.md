@@ -1,6 +1,6 @@
 # Controle Visual Rumo Cavan
 
-Site estático para controle visual de estoque e inspeções realizadas dos subcomponentes ferroviários armazenados na Cavan.
+Site estático para controle visual de estoque, inspeções realizadas e cruzamento geral dos subcomponentes ferroviários armazenados na Cavan.
 
 ## Estrutura
 
@@ -25,6 +25,14 @@ Site estático para controle visual de estoque e inspeções realizadas dos subc
 4. Em **Build and deployment**, selecione **Deploy from a branch**.
 5. Escolha a branch `main` e a pasta `/root`.
 6. Salve e aguarde o link do GitHub Pages ficar disponível.
+
+## Abas do painel
+
+- **Importar planilha**: carrega novas planilhas `.xlsx` no mesmo padrão.
+- **Dashboard geral**: cruza estoque e inspeções por **subcomponente/material + lote**, mostrando cobertura, pendências, NC e diferenças entre saldo em estoque e QTD Estoque registrada na inspeção.
+- **Dashboard de estoque**: visão exclusiva das entradas e saldo estimado.
+- **Dashboard de inspeções realizadas**: visão exclusiva dos registros executados.
+- **Cards por subcomponente**: resumo consolidado por item.
 
 ## Como atualizar os dados
 
