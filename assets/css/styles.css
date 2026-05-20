@@ -397,3 +397,99 @@ footer{min-height:32px;padding:6px 12px;border-radius:16px;font-size:11px}
   .content{overflow:visible}
   .view,.dashboard-grid{overflow:visible}
 }
+
+
+/* Ajuste solicitado: voltar com rolagem vertical da página.
+   Mantém o site compatível com GitHub Pages e evita rolagem horizontal. */
+html,
+body{
+  width:100%;
+  min-height:100%;
+  height:auto;
+  overflow-x:hidden;
+  overflow-y:auto;
+}
+body{
+  min-height:100vh;
+}
+.app{
+  height:auto;
+  min-height:100vh;
+  overflow:visible;
+  grid-template-rows:auto auto auto;
+}
+.content,
+.view,
+.view-dashboard,
+.view-cards,
+.dashboard-grid,
+.dashboard-grid > .panel,
+.panel{
+  height:auto;
+  min-height:0;
+  overflow:visible;
+}
+.content{
+  margin:0;
+}
+.view-dashboard{
+  grid-template-rows:auto auto auto;
+}
+.view-cards{
+  grid-template-rows:auto auto auto;
+}
+.dashboard-grid{
+  grid-template-rows:none;
+  grid-auto-rows:minmax(300px, auto);
+  align-items:stretch;
+}
+.dashboard-grid > .panel,
+.panel{
+  min-height:220px;
+}
+.filter-panel,
+.kpi{
+  min-height:auto;
+}
+.panel.filter-panel{
+  min-height:auto;
+}
+.svg-chart{
+  min-height:240px;
+  height:240px;
+}
+.bar-list,
+.dual-list,
+.cards,
+.legend{
+  overflow:visible;
+}
+.table-wrap{
+  overflow:hidden;
+}
+.scroll{
+  overflow:visible;
+  max-height:none;
+}
+table{
+  width:100%;
+  max-width:100%;
+}
+.cards{
+  grid-template-rows:none;
+  align-items:stretch;
+}
+.card{
+  min-height:190px;
+}
+footer{
+  overflow:visible;
+}
+
+@media (max-height:720px){
+  html,body{overflow-x:hidden;overflow-y:auto;}
+  .app{height:auto;min-height:100vh;overflow:visible;grid-template-rows:auto auto auto;}
+  .content,.view,.view-dashboard,.view-cards,.dashboard-grid,.panel{overflow:visible;height:auto;}
+  .dashboard-grid{grid-template-rows:none;grid-auto-rows:minmax(290px, auto);}
+  .svg-chart{min-height:220px;height:220px;}
+}
