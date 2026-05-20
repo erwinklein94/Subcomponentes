@@ -4,7 +4,7 @@
   - HTML: index.html
   - CSS: assets/css/styles.css
   - JS: assets/js/app.js
-  - Base inicial: data/base-data.json
+  - Dados: carregados somente por importação de planilha no navegador
 */
 'use strict';
 
@@ -27,45 +27,36 @@ const TABS = [
   ['cards', '◇', 'Cards por subcomponente']
 ];
 
-let BASE_DATA = { estoque: [], executados: [] };
 let initial = null;
 let state = null;
-let baseLoadError = '';
 
-async function loadBaseData() {
-  try {
-    const response = await fetch('./data/base-data.json', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    return {
-      estoque: Array.isArray(data.estoque) ? data.estoque : [],
-      executados: Array.isArray(data.executados) ? data.executados : []
-    };
-  } catch (error) {
-    console.error('Erro ao carregar data/base-data.json:', error);
-    baseLoadError = 'Não consegui carregar a base incorporada. No GitHub Pages isso deve funcionar normalmente; para testar localmente, abra com um servidor local, como VS Code Live Server.';
-    return { estoque: [], executados: [] };
-  }
+function emptyDataset() {
+  return {
+    estoque: [],
+    executados: [],
+    source: 'Nenhuma planilha importada',
+    importedAt: 'Aguardando importação',
+    sheetNames: { estoqueName: '—', executadosName: '—' }
+  };
 }
 
-function createInitialState(baseData) {
-  initial = {
-    estoque: baseData.estoque,
-    executados: baseData.executados,
-    source: 'Estoque Cavan Subcomponentes(1).xlsx',
-    importedAt: 'Base incorporada ao site',
-    sheetNames: { estoqueName: 'Estoque', executadosName: 'Executados' }
-  };
-
+function defaultFilters() {
   return {
-    data: initial,
-    active: 'geral',
     generalFilters: { component: '', status: '', hasNc: '', search: '' },
     stockFilters: { component: '', factory: '', status: '', search: '' },
     inspFilters: { material: '', fornecedor: '', status: '', semana: '', search: '' },
-    cardFilters: { query: '', hasNc: '', hasStock: '' },
+    cardFilters: { query: '', hasNc: '', hasStock: '' }
+  };
+}
+
+function createInitialState() {
+  initial = emptyDataset();
+  return {
+    data: initial,
+    active: 'importar',
+    ...defaultFilters(),
     message: '',
-    error: baseLoadError
+    error: ''
   };
 }
 
@@ -357,7 +348,7 @@ function header() {
     <div class="hero-content">
       <div>
         <div class="brand-row"><div class="logo">rum<span class="o">o</span></div><div class="divider"></div><div><p class="eyebrow">Cavan • Subcomponentes ferroviários</p><h1>Controle visual de estoque e inspeções</h1></div></div>
-        <p class="desc">Painel baseado na nova planilha com abas de estoque e inspeções já realizadas. O dashboard geral cruza subcomponente + lote para mostrar o que tem saldo, o que já foi inspecionado e o que ainda precisa de atenção.</p>
+        <p class="desc">Painel zerado por padrão. Importe uma planilha no modelo combinado para preencher estoque, inspeções realizadas e o cruzamento por subcomponente + lote.</p>
       </div>
       <div class="hero-metrics">
         <div class="tile clip yellow"><div class="tile-label">Base</div><div class="tile-value" style="font-size:15px">${esc(d.source)}</div></div>
@@ -408,14 +399,22 @@ function empty(title = 'Sem dados para exibir', sub = 'Importe uma planilha ou a
   return `<div class="empty"><strong>${title}</strong><br><span>${sub}</span></div>`;
 }
 
+function hasData() {
+  return Boolean((state?.data?.estoque?.length || 0) + (state?.data?.executados?.length || 0));
+}
+function importPrompt(area = 'Dashboard') {
+  return panel(area, 'Nenhuma planilha importada ainda.', '⬆', `<div class="empty"><strong>O painel está zerado.</strong><br><span>Importe uma planilha .xlsx no mesmo modelo para carregar estoque, inspeções realizadas, cards e cruzamento geral.</span><div style="margin-top:18px"><button class="primary" data-tab="importar">Ir para importar planilha</button></div></div>`);
+}
 function renderImport() {
   const d = state.data;
+  const loaded = hasData();
   return `<div class="grid grid-2">
-    ${panel('Importar planilha', 'Use a nova base como padrão e substitua pelos próximos arquivos no mesmo formato.', '⬆', `<div class="drop" id="drop"><div class="upload-circle">⬆</div><h2>Arraste a planilha aqui</h2><p class="subtitle" style="max-width:720px;margin:10px auto 0">O site procura automaticamente uma aba de estoque e uma aba de inspeções realizadas. O cruzamento geral usa subcomponente/material + lote para comparar saldo de estoque, estoque informado na inspeção, quantidade inspecionada e NC.</p><div style="margin-top:22px"><label class="primary">Selecionar arquivo .xlsx <input id="fileInput" type="file" accept=".xlsx,.xls" hidden></label><button class="secondary" id="resetBase" style="margin-left:10px">Restaurar base</button></div>${state.message ? `<div class="message ok">${esc(state.message)}</div>` : ''}${state.error ? `<div class="message warn">${esc(state.error)}</div>` : ''}${!window.XLSX ? `<div class="message warn">A biblioteca de importação ainda não carregou. Abra o arquivo com internet ativa para importar novas planilhas.</div>` : ''}</div>`)}
-    ${panel('Base carregada', 'Planilha padrão já está incorporada no site.', '✓', `<div class="grid grid-2"><div class="tile clip yellow"><div class="tile-label">Fonte atual</div><div class="tile-value" style="font-size:18px">${esc(d.source)}</div><div style="margin-top:6px;opacity:.72;font-size:13px">${esc(d.importedAt)}</div></div><div class="tile clip"><div class="tile-label">Abas lidas</div><div style="margin-top:12px;font-weight:800">Estoque: ${esc(text(d.sheetNames?.estoqueName, 'Estoque'))}</div><div style="margin-top:6px;font-weight:800">Inspeções: ${esc(text(d.sheetNames?.executadosName, 'Executados'))}</div></div><div class="tile clip"><div class="tile-label">Estoque</div><div class="tile-value">${fmt(d.estoque.length)}</div><div class="subtitle">linhas válidas</div></div><div class="tile clip"><div class="tile-label">Inspeções</div><div class="tile-value">${fmt(d.executados.length)}</div><div class="subtitle">registros executados</div></div></div><div class="hint" style="margin-top:18px"><strong style="color:white">Cabeçalhos esperados</strong><br>Estoque: Data, Fábrica, Subcomponente, Lote, Quantidade Entrada, Amostragem, Data da Inspeção.<br>Inspeções: Dia Inspeção, Semana, Material, Fornecedor, Lote, QTD Estoque, QTD Amostra, QTD Inspecionado, QTD NC, Status.</div>`)}
+    ${panel('Importar planilha', 'O site inicia sem dados. Carregue uma planilha no mesmo modelo para preencher os dashboards.', '⬆', `<div class="drop" id="drop"><div class="upload-circle">⬆</div><h2>Arraste a planilha aqui</h2><p class="subtitle" style="max-width:720px;margin:10px auto 0">O site procura automaticamente uma aba de estoque e uma aba de inspeções realizadas. O cruzamento geral usa subcomponente/material + lote para comparar saldo de estoque, estoque informado na inspeção, quantidade inspecionada e NC.</p><div style="margin-top:22px"><label class="primary">Selecionar arquivo .xlsx <input id="fileInput" type="file" accept=".xlsx,.xls" hidden></label><button class="secondary" id="resetBase" style="margin-left:10px">Limpar dados</button></div>${state.message ? `<div class="message ok">${esc(state.message)}</div>` : ''}${state.error ? `<div class="message warn">${esc(state.error)}</div>` : ''}${!window.XLSX ? `<div class="message warn">A biblioteca de importação ainda não carregou. Abra o site com internet ativa para importar novas planilhas.</div>` : ''}</div>`)}
+    ${panel('Status da base', loaded ? 'Planilha carregada nesta sessão.' : 'Aguardando importação da sua planilha.', loaded ? '✓' : '○', `<div class="grid grid-2"><div class="tile clip ${loaded ? 'yellow' : ''}"><div class="tile-label">Fonte atual</div><div class="tile-value" style="font-size:18px">${esc(d.source)}</div><div style="margin-top:6px;opacity:.72;font-size:13px">${esc(d.importedAt)}</div></div><div class="tile clip"><div class="tile-label">Abas lidas</div><div style="margin-top:12px;font-weight:800">Estoque: ${esc(text(d.sheetNames?.estoqueName, '—'))}</div><div style="margin-top:6px;font-weight:800">Inspeções: ${esc(text(d.sheetNames?.executadosName, '—'))}</div></div><div class="tile clip"><div class="tile-label">Estoque</div><div class="tile-value">${fmt(d.estoque.length)}</div><div class="subtitle">linhas válidas</div></div><div class="tile clip"><div class="tile-label">Inspeções</div><div class="tile-value">${fmt(d.executados.length)}</div><div class="subtitle">registros executados</div></div></div><div class="hint" style="margin-top:18px"><strong style="color:white">Cabeçalhos esperados</strong><br>Estoque: Data, Fábrica, Subcomponente, Lote, Quantidade Entrada, Amostragem, Data da Inspeção.<br>Inspeções: Dia Inspeção, Semana, Material, Fornecedor, Lote, QTD Estoque, QTD Amostra, QTD Inspecionado, QTD NC, Status.</div>`)}
   </div>`;
 }
 function renderGeneral() {
+  if (!hasData()) return importPrompt('Dashboard geral');
   const rows = buildComparisonRows();
   const f = state.generalFilters;
   const filtered = filterComparisonRows(rows, f);
@@ -459,6 +458,7 @@ function filtersStock(records, filters) {
   return `<div class="filter-grid grid-4"><label class="control">Subcomponente<select data-filter="stock.component">${optionList(uniq(records, (r) => r.subcomponente), filters.component)}</select></label><label class="control">Fábrica<select data-filter="stock.factory">${optionList(uniq(records, (r) => r.fabrica), filters.factory)}</select></label><label class="control">Status<select data-filter="stock.status">${optionList(uniq(records, (r) => r.status), filters.status)}</select></label><label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(filters.search)}" placeholder="Buscar lote, material, observação..." data-filter="stock.search"></div></label></div>`;
 }
 function renderStock() {
+  if (!hasData()) return importPrompt('Dashboard de estoque');
   const enriched = state.data.estoque.map((r) => ({ ...r, status: stockStatus(r) }));
   const f = state.stockFilters;
   const filtered = enriched.filter((r) => (!f.component || r.subcomponente === f.component) && (!f.factory || r.fabrica === f.factory) && (!f.status || r.status === f.status) && matches(`${r.subcomponente} ${r.lote} ${r.fabrica} ${r.obs} ${r.dataInspecao}`, f.search));
@@ -479,6 +479,7 @@ function stockTable(rows) {
   return `<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Data</th><th>Fábrica</th><th>Subcomponente</th><th>Lote</th><th class="right">Entrada</th><th class="right">Amostragem</th><th>Status</th><th>Inspeção</th></tr></thead><tbody>${rows.slice(0, 250).map((r) => `<tr><td>${esc(fdate(r.data))}</td><td>${esc(text(r.fabrica))}</td><td><strong>${esc(text(r.subcomponente))}</strong></td><td>${esc(text(r.lote))}</td><td class="right"><strong>${fmt(r.quantidadeEntrada)}</strong></td><td class="right">${fmt(r.amostragem)}</td><td>${pill(r.status)}</td><td>${esc(fdate(r.dataInspecao))}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function renderInspections() {
+  if (!hasData()) return importPrompt('Dashboard de inspeções realizadas');
   const records = state.data.executados;
   const f = state.inspFilters;
   const filtered = records.filter((r) => (!f.material || r.material === f.material) && (!f.fornecedor || r.fornecedor === f.fornecedor) && (!f.status || r.status === f.status) && (!f.semana || r.semana === f.semana) && matches(`${r.material} ${r.lote} ${r.fornecedor} ${r.status} ${r.codSap}`, f.search));
@@ -531,6 +532,7 @@ function combineCards() {
   return [...map.values()].map((c) => ({ ...c, lotes: [...c.lotes], fabricas: [...c.fabricas], status: [...c.status], fornecedores: [...c.fornecedores], ncRate: c.qtdInspecionado ? c.qtdNc / c.qtdInspecionado * 100 : 0 })).sort((a, b) => b.saldoEstimado - a.saldoEstimado || b.qtdInspecionado - a.qtdInspecionado);
 }
 function renderCards() {
+  if (!hasData()) return importPrompt('Cards por subcomponente');
   const f = state.cardFilters;
   const cards = combineCards().filter((c) => (f.hasNc !== 'sim' || c.qtdNc > 0) && (f.hasNc !== 'nao' || c.qtdNc <= 0) && (f.hasStock !== 'sim' || c.saldoEstimado > 0) && (f.hasStock !== 'nao' || c.saldoEstimado <= 0) && matches(`${c.name} ${c.fabricas.join(' ')} ${c.fornecedores.join(' ')} ${c.status.join(' ')}`, f.query));
   return `${panel('Filtros dos cards', 'Cards consolidados por subcomponente/material.', '☰', `<div class="filter-grid grid-3"><label class="control">Busca<div class="search-wrap">🔎<input type="search" value="${esc(f.query)}" placeholder="Buscar subcomponente, fábrica ou fornecedor..." data-filter="card.query"></div></label><label class="control">Com NC?<select data-filter="card.hasNc">${optionList(['sim', 'nao'], f.hasNc)}</select></label><label class="control">Com saldo estimado?<select data-filter="card.hasStock">${optionList(['sim', 'nao'], f.hasStock)}</select></label></div>`)}<div style="height:18px"></div><div class="cards">${cards.map(cardHtml).join('')}</div>${cards.length ? '' : empty('Nenhum card encontrado', 'Ajuste os filtros dos cards para visualizar os subcomponentes.')}`;
@@ -634,6 +636,7 @@ async function importFile(file) {
     const parsed = parseWorkbook(wb);
     if (!parsed.estoque.length && !parsed.executados.length) throw new Error('Não encontrei as abas/colunas esperadas. Confira se há abas de Estoque e Executados/Inspeções.');
     state.data = { ...parsed, source: file.name, importedAt: new Date().toLocaleString('pt-BR') };
+    Object.assign(state, defaultFilters());
     state.active = 'geral';
     state.message = `Planilha importada: ${parsed.estoque.length} registros de estoque e ${parsed.executados.length} inspeções.`;
     state.error = '';
@@ -662,9 +665,10 @@ function bind() {
   if (file) file.addEventListener('change', (e) => importFile(e.target.files[0]));
   const reset = $('#resetBase');
   if (reset) reset.addEventListener('click', () => {
-    state.data = initial;
-    state.active = 'geral';
-    state.message = 'Base original restaurada.';
+    state.data = emptyDataset();
+    Object.assign(state, defaultFilters());
+    state.active = 'importar';
+    state.message = 'Dados limpos. Importe uma planilha para preencher o painel.';
     state.error = '';
     render();
   });
@@ -691,9 +695,8 @@ window.addEventListener('xlsx-ready', () => {
   if (state && state.active === 'importar') render();
 });
 
-async function init() {
-  BASE_DATA = await loadBaseData();
-  state = createInitialState(BASE_DATA);
+function init() {
+  state = createInitialState();
   render();
 }
 

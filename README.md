@@ -1,6 +1,8 @@
 # Controle Visual Rumo Cavan
 
-Site estático para controle visual de estoque, inspeções realizadas e cruzamento geral dos subcomponentes ferroviários armazenados na Cavan.
+Site estático para GitHub Pages, com importação local de planilhas `.xlsx`, dashboards de estoque, inspeções realizadas e cruzamento geral por **subcomponente/material + lote**.
+
+O site **inicia zerado**. Nenhuma informação de estoque ou inspeção fica embutida no projeto. Os dashboards só são preenchidos depois que você importar uma planilha no mesmo modelo combinado.
 
 ## Estrutura
 
@@ -12,8 +14,6 @@ Site estático para controle visual de estoque, inspeções realizadas e cruzame
 │   │   └── styles.css
 │   └── js/
 │       └── app.js
-├── data/
-│   └── base-data.json
 └── .nojekyll
 ```
 
@@ -28,28 +28,51 @@ Site estático para controle visual de estoque, inspeções realizadas e cruzame
 
 ## Abas do painel
 
-- **Importar planilha**: carrega novas planilhas `.xlsx` no mesmo padrão.
+- **Importar planilha**: carrega a planilha `.xlsx` no mesmo padrão.
 - **Dashboard geral**: cruza estoque e inspeções por **subcomponente/material + lote**, mostrando cobertura, pendências, NC e diferenças entre saldo em estoque e QTD Estoque registrada na inspeção.
 - **Dashboard de estoque**: visão exclusiva das entradas e saldo estimado.
 - **Dashboard de inspeções realizadas**: visão exclusiva dos registros executados.
 - **Cards por subcomponente**: resumo consolidado por item.
 
-## Como atualizar os dados
+## Como usar
 
-O site já carrega a base inicial em `data/base-data.json`.
+1. Abra o site publicado no GitHub Pages.
+2. Entre na aba **Importar planilha**.
+3. Arraste o arquivo `.xlsx` ou clique em **Selecionar arquivo .xlsx**.
+4. Depois da leitura, o site muda para o **Dashboard geral** e libera as demais visões com os dados importados.
 
-Para usar uma planilha mais nova, abra a aba **Importar planilha** no próprio site e carregue um arquivo `.xlsx` com abas no mesmo padrão da planilha base:
+A importação acontece no navegador. Os dados da planilha não são enviados para servidor e não ficam salvos dentro do repositório.
 
-- Aba de estoque: preferencialmente `Estoque`
-- Aba de inspeções realizadas: preferencialmente `Executados`
+## Modelo esperado da planilha
 
-A importação acontece no navegador. Os dados da planilha não são enviados para servidor.
+Aba de estoque, preferencialmente chamada `Estoque`, com cabeçalhos como:
+
+- Data
+- Fábrica
+- Subcomponente
+- Lote
+- Quantidade Entrada
+- Amostragem
+- Data da Inspeção
+
+Aba de inspeções realizadas, preferencialmente chamada `Executados` ou com nome contendo `Inspeções`, com cabeçalhos como:
+
+- Dia Inspeção
+- Semana
+- Material
+- Fornecedor
+- Lote
+- QTD Estoque
+- QTD Amostra
+- QTD Inspecionado
+- QTD NC
+- Status
 
 ## Teste local
 
-Como o site carrega `data/base-data.json` via `fetch`, abrir o `index.html` diretamente por `file://` pode bloquear a base inicial em alguns navegadores.
+Este projeto não depende de build. Você pode abrir o `index.html` diretamente, mas a importação da planilha precisa que a biblioteca XLSX carregue pela internet.
 
-Para testar localmente, use um servidor estático simples, por exemplo:
+Para simular melhor o GitHub Pages, use um servidor estático simples:
 
 ```bash
 python -m http.server 8000
@@ -60,5 +83,3 @@ Depois abra:
 ```text
 http://localhost:8000
 ```
-
-Outra opção é usar a extensão **Live Server** no VS Code.
