@@ -243,7 +243,7 @@ function buildComparisonRows() {
     const hasInspection = Boolean(inspection);
     const diffEstoqueInspecao = saldoEstoque - qtdEstoqueInspecao;
     let status = 'Fora do estoque';
-    if (hasActiveStock && hasInspection) status = qtdNc > 0 ? 'Batido com NC' : 'Batido';
+    if (hasActiveStock && hasInspection) status = qtdNc > 0 ? 'Inspeção realizada com NC' : 'Inspeção realizada';
     if (hasActiveStock && !hasInspection) status = 'Pendente de inspeção';
     if (!hasActiveStock && hasInspection) status = 'Inspecionado sem saldo atual';
     if (hasStockRecord && !hasActiveStock && !hasInspection) status = 'Fora do estoque';
@@ -274,7 +274,7 @@ function buildComparisonRows() {
       lastDate: inspection?.lastDate || ''
     };
   }).sort((a, b) => {
-    const weight = (r) => r.status === 'Pendente de inspeção' ? 4 : r.status === 'Batido com NC' ? 3 : r.status === 'Batido' ? 2 : 1;
+    const weight = (r) => r.status === 'Pendente de inspeção' ? 4 : r.status === 'Inspeção realizada com NC' ? 3 : r.status === 'Inspeção realizada' ? 2 : 1;
     return weight(b) - weight(a) || b.saldoEstoque - a.saldoEstoque || a.component.localeCompare(b.component, 'pt-BR');
   });
 }
@@ -298,7 +298,7 @@ function componentComparison(rows) {
       inspecionado: 0,
       nc: 0,
       lotesEstoque: 0,
-      lotesBatidos: 0,
+      lotesComInspecao: 0,
       pendentes: 0
     };
     item.estoque += r.saldoEstoque;
@@ -306,7 +306,7 @@ function componentComparison(rows) {
     item.inspecionado += r.qtdInspecionado;
     item.nc += r.qtdNc;
     if (r.hasActiveStock) item.lotesEstoque += 1;
-    if (r.hasActiveStock && r.hasInspection) item.lotesBatidos += 1;
+    if (r.hasActiveStock && r.hasInspection) item.lotesComInspecao += 1;
     if (r.status === 'Pendente de inspeção') item.pendentes += 1;
     map.set(key, item);
   });
@@ -327,7 +327,7 @@ function dualBarList(data) {
 function progressList(data) {
   if (!data.length) return empty();
   return `<div class="bar-list">${data.map((d) => {
-    const cobertura = ratioPct(d.lotesBatidos, d.lotesEstoque);
+    const cobertura = ratioPct(d.lotesComInspecao, d.lotesEstoque);
     return `<div class="bar-row"><div class="bar-label" title="${esc(d.name)}">${esc(d.name)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, Math.min(100, cobertura))}%"></div></div><div class="bar-value">${pct(cobertura)}</div></div>`;
   }).join('')}</div>`;
 }
@@ -343,20 +343,32 @@ function header() {
   const comparison = buildComparisonRows();
   const stockLots = comparison.filter((r) => r.hasActiveStock).length;
   const matchedLots = comparison.filter((r) => r.hasActiveStock && r.hasInspection).length;
-  return `<header class="hero">
-    <div class="pattern">${Array.from({ length: 24 }, () => '<span></span>').join('')}</div>
-    <div class="hero-content">
-      <div>
-        <div class="brand-row"><div class="logo">rum<span class="o">o</span></div><div class="divider"></div><div><p class="eyebrow">Cavan • Subcomponentes ferroviários</p><h1>Controle visual de estoque e inspeções</h1></div></div>
-        <p class="desc">Painel zerado por padrão. Importe uma planilha no modelo combinado para preencher estoque, inspeções realizadas e o cruzamento por subcomponente + lote.</p>
+  const baseLoaded = state.data.estoque.length > 0 || state.data.executados.length > 0;
+  const sourceLabel = baseLoaded ? d.source : 'Nenhuma planilha importada';
+  return `<header class="hero hero-clean">
+    <div class="hero-top">
+      <div class="brand-lockup">
+        <div class="logo" aria-label="Rumo">rum<span class="o">o</span></div>
+        <div class="brand-copy">
+          <p class="eyebrow">Cavan • Subcomponentes ferroviários</p>
+          <h1>Controle visual de estoque e inspeções</h1>
+        </div>
       </div>
-      <div class="hero-metrics">
-        <div class="tile clip yellow"><div class="tile-label">Base</div><div class="tile-value" style="font-size:15px">${esc(d.source)}</div></div>
-        <div class="tile clip"><div class="tile-label">Lotes em estoque</div><div class="tile-value">${fmt(stockLots)}</div></div>
-        <div class="tile clip"><div class="tile-label">Lotes batidos</div><div class="tile-value">${fmt(matchedLots)}</div></div>
+      <div class="base-badge ${baseLoaded ? 'loaded' : ''}" title="${esc(sourceLabel)}">
+        <span class="status-dot"></span>
+        <span class="base-kicker">Base atual</span>
+        <strong>${esc(sourceLabel)}</strong>
       </div>
     </div>
-    <nav class="tabs">${TABS.map(([id, ico, label]) => `<button class="tab-btn ${state.active === id ? 'active' : ''}" data-tab="${id}"><span>${label}</span><span>${ico}</span></button>`).join('')}</nav>
+    <div class="hero-summary">
+      <p class="desc">Importe uma planilha no modelo combinado para visualizar estoque, inspeções realizadas e o cruzamento por subcomponente + lote.</p>
+      <div class="hero-metrics">
+        <div class="tile clip"><div class="tile-label">Lotes em estoque</div><div class="tile-value">${fmt(stockLots)}</div></div>
+        <div class="tile clip"><div class="tile-label">Inspeções realizadas</div><div class="tile-value">${fmt(matchedLots)}</div></div>
+        <div class="tile clip yellow"><div class="tile-label">Cobertura</div><div class="tile-value">${pct(ratioPct(matchedLots, stockLots))}</div></div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Navegação principal">${TABS.map(([id, ico, label]) => `<button class="tab-btn ${state.active === id ? 'active' : ''}" data-tab="${id}" aria-current="${state.active === id ? 'page' : 'false'}"><span class="tab-icon">${ico}</span><span class="tab-label">${label}</span></button>`).join('')}</nav>
   </header>`;
 }
 function panel(title, subtitle, icon, body, extra = '') {
@@ -430,7 +442,7 @@ function renderGeneral() {
   const status = groupCount(filtered, (r) => r.status);
   const pendentes = comp.filter((d) => d.pendentes > 0).map((d) => ({ name: d.name, value: d.pendentes })).slice(0, 10);
   const nc = filtered.filter((r) => r.qtdNc > 0).map((r) => ({ name: `${r.component} • ${r.lote}`, value: r.qtdNc })).sort((a, b) => b.value - a.value).slice(0, 10);
-  const coberturaPorComponente = comp.filter((d) => d.lotesEstoque > 0).sort((a, b) => ratioPct(a.lotesBatidos, a.lotesEstoque) - ratioPct(b.lotesBatidos, b.lotesEstoque)).slice(0, 10);
+  const coberturaPorComponente = comp.filter((d) => d.lotesEstoque > 0).sort((a, b) => ratioPct(a.lotesComInspecao, a.lotesEstoque) - ratioPct(b.lotesComInspecao, b.lotesEstoque)).slice(0, 10);
 
   return `<div class="grid grid-4">
     ${kpi('Cobertura de lotes', pct(cobertura), `${fmt(matchedLots)} de ${fmt(activeStockLots)} lotes em estoque`, '⇄', THEME.blue)}
